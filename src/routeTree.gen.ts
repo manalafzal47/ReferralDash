@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as CandidatesIndexRouteImport } from './routes/candidates.index'
 import { Route as CandidatesCandidateIdRouteImport } from './routes/candidates.$candidateId'
 
@@ -22,6 +23,11 @@ const IndexRoute = IndexRouteImport.update({
 const CampaignsRoute = CampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesRoute = MessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CandidatesIndexRoute = CandidatesIndexRouteImport.update({
@@ -38,12 +44,14 @@ const CandidatesCandidateIdRoute = CandidatesCandidateIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates': typeof CandidatesIndexRoute
 }
@@ -51,18 +59,30 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/campaigns' | '/candidates/$candidateId' | '/candidates/'
+  fullPaths:
+    | '/'
+    | '/campaigns'
+    | '/messages'
+    | '/candidates/$candidateId'
+    | '/candidates/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/campaigns' | '/candidates/$candidateId' | '/candidates'
+  to:
+    | '/'
+    | '/campaigns'
+    | '/messages'
+    | '/candidates/$candidateId'
+    | '/candidates'
   id:
     | '__root__'
     | '/'
     | '/campaigns'
+    | '/messages'
     | '/candidates/$candidateId'
     | '/candidates/'
   fileRoutesById: FileRoutesById
@@ -70,6 +90,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CampaignsRoute: typeof CampaignsRoute
+  MessagesRoute: typeof MessagesRoute
   CandidatesCandidateIdRoute: typeof CandidatesCandidateIdRoute
   CandidatesIndexRoute: typeof CandidatesIndexRoute
 }
@@ -88,6 +109,13 @@ declare module '@tanstack/react-router' {
       path: '/campaigns'
       fullPath: '/campaigns'
       preLoaderRoute: typeof CampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages': {
+      id: '/messages'
+      path: '/messages'
+      fullPath: '/messages'
+      preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/candidates/': {
@@ -110,6 +138,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CampaignsRoute: CampaignsRoute,
+  MessagesRoute: MessagesRoute,
   CandidatesCandidateIdRoute: CandidatesCandidateIdRoute,
   CandidatesIndexRoute: CandidatesIndexRoute,
 }

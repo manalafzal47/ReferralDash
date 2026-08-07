@@ -58,7 +58,8 @@ function CandidateMissing() {
 }
 
 function CandidateDetail() {
-  const { candidate } = Route.useLoaderData();
+  const { candidateId } = Route.useParams();
+  const candidate = getCandidate(candidateId) as Candidate;
   const related = candidates.filter(
     (c) => c.campaignId === candidate.campaignId && c.id !== candidate.id,
   );
