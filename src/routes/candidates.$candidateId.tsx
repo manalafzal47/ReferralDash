@@ -16,13 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { candidates, getCandidate } from "@/data/outreach";
+import { candidates, getCandidate, type Candidate } from "@/data/outreach";
 
 export const Route = createFileRoute("/candidates/$candidateId")({
   loader: ({ params }) => {
     const candidate = getCandidate(params.candidateId);
     if (!candidate) throw notFound();
-    return { candidate };
+    return { candidate } as { candidate: Candidate };
   },
   head: ({ loaderData }) => {
     if (!loaderData) {

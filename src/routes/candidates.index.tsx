@@ -27,7 +27,7 @@ import { campaigns, candidates } from "@/data/outreach";
 
 export const Route = createFileRoute("/candidates/")({
   validateSearch: (search: Record<string, unknown>) => ({
-    campaign: typeof search.campaign === "string" ? search.campaign : "all",
+    campaign: typeof search['campaign'] === "string" ? (search['campaign'] as string) : "all",
   }),
   head: () => ({
     meta: [
