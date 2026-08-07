@@ -1,4 +1,3 @@
-<<<<<<< keep
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Eye, MessageSquarePlus, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -26,7 +25,7 @@ import {
 } from "@/components/ui/table";
 import { campaigns, candidates } from "@/data/outreach";
 
-export const Route = createFileRoute("/candidates")({
+export const Route = createFileRoute("/candidates/")({
   validateSearch: (search: Record<string, unknown>) => ({
     campaign: typeof search.campaign === "string" ? search.campaign : "all",
   }),
