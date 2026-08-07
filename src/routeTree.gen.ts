@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
+import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as CandidatesIndexRouteImport } from './routes/candidates.index'
 import { Route as CandidatesCandidateIdRouteImport } from './routes/candidates.$candidateId'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const CampaignsRoute = CampaignsRouteImport.update({
   id: '/campaigns',
   path: '/campaigns',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FollowUpsRoute = FollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesRoute = MessagesRouteImport.update({
@@ -44,6 +50,7 @@ const CandidatesCandidateIdRoute = CandidatesCandidateIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates': typeof CandidatesIndexRoute
@@ -59,6 +67,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/campaigns': typeof CampaignsRoute
+  '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
@@ -68,6 +77,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/campaigns'
+    | '/follow-ups'
     | '/messages'
     | '/candidates/$candidateId'
     | '/candidates/'
@@ -75,6 +85,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/campaigns'
+    | '/follow-ups'
     | '/messages'
     | '/candidates/$candidateId'
     | '/candidates'
@@ -82,6 +93,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/campaigns'
+    | '/follow-ups'
     | '/messages'
     | '/candidates/$candidateId'
     | '/candidates/'
@@ -90,6 +102,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CampaignsRoute: typeof CampaignsRoute
+  FollowUpsRoute: typeof FollowUpsRoute
   MessagesRoute: typeof MessagesRoute
   CandidatesCandidateIdRoute: typeof CandidatesCandidateIdRoute
   CandidatesIndexRoute: typeof CandidatesIndexRoute
@@ -109,6 +122,13 @@ declare module '@tanstack/react-router' {
       path: '/campaigns'
       fullPath: '/campaigns'
       preLoaderRoute: typeof CampaignsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/follow-ups': {
+      id: '/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/follow-ups'
+      preLoaderRoute: typeof FollowUpsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages': {
@@ -138,6 +158,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CampaignsRoute: CampaignsRoute,
+  FollowUpsRoute: FollowUpsRoute,
   MessagesRoute: MessagesRoute,
   CandidatesCandidateIdRoute: CandidatesCandidateIdRoute,
   CandidatesIndexRoute: CandidatesIndexRoute,
