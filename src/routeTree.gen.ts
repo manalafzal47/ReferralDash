@@ -14,6 +14,7 @@ import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as FollowUpsRouteImport } from './routes/follow-ups'
 import { Route as MessagesRouteImport } from './routes/messages'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as CandidatesIndexRouteImport } from './routes/candidates.index'
 import { Route as CandidatesCandidateIdRouteImport } from './routes/candidates.$candidateId'
 
@@ -42,6 +43,11 @@ const MessagesRoute = MessagesRouteImport.update({
   path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CandidatesIndexRoute = CandidatesIndexRouteImport.update({
   id: '/candidates/',
   path: '/candidates/',
@@ -59,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/campaigns': typeof CampaignsRoute
   '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
+  '/settings': typeof SettingsRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
 }
@@ -68,6 +75,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsRoute
   '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
+  '/settings': typeof SettingsRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates': typeof CandidatesIndexRoute
 }
@@ -78,6 +86,7 @@ export interface FileRoutesById {
   '/campaigns': typeof CampaignsRoute
   '/follow-ups': typeof FollowUpsRoute
   '/messages': typeof MessagesRoute
+  '/settings': typeof SettingsRoute
   '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
   '/candidates/': typeof CandidatesIndexRoute
 }
@@ -89,6 +98,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/follow-ups'
     | '/messages'
+    | '/settings'
     | '/candidates/$candidateId'
     | '/candidates/'
   fileRoutesByTo: FileRoutesByTo
@@ -98,6 +108,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/follow-ups'
     | '/messages'
+    | '/settings'
     | '/candidates/$candidateId'
     | '/candidates'
   id:
@@ -107,6 +118,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/follow-ups'
     | '/messages'
+    | '/settings'
     | '/candidates/$candidateId'
     | '/candidates/'
   fileRoutesById: FileRoutesById
@@ -117,6 +129,7 @@ export interface RootRouteChildren {
   CampaignsRoute: typeof CampaignsRoute
   FollowUpsRoute: typeof FollowUpsRoute
   MessagesRoute: typeof MessagesRoute
+  SettingsRoute: typeof SettingsRoute
   CandidatesCandidateIdRoute: typeof CandidatesCandidateIdRoute
   CandidatesIndexRoute: typeof CandidatesIndexRoute
 }
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MessagesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/candidates/': {
       id: '/candidates/'
       path: '/candidates'
@@ -181,6 +201,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsRoute: CampaignsRoute,
   FollowUpsRoute: FollowUpsRoute,
   MessagesRoute: MessagesRoute,
+  SettingsRoute: SettingsRoute,
   CandidatesCandidateIdRoute: CandidatesCandidateIdRoute,
   CandidatesIndexRoute: CandidatesIndexRoute,
 }

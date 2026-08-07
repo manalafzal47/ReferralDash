@@ -113,7 +113,7 @@ function Toggle({
 }: {
   label: string;
   hint: string;
-  defaultChecked?: boolean;
+  defaultChecked?: boolean | undefined;
 }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 py-1">
@@ -121,7 +121,7 @@ function Toggle({
         <p className="text-sm font-medium">{label}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
       </div>
-      <Switch defaultChecked={defaultChecked} className="mt-0.5 shrink-0" />
+      <Switch defaultChecked={defaultChecked ?? false} className="mt-0.5 shrink-0" />
     </div>
   );
 }
