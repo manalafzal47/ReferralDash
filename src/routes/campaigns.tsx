@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Page, PageHeader } from "@/components/page-shell";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { campaigns } from "@/data/outreach";
+import { createCampaign, listCampaigns, type CreateCampaignInput } from "@/lib/api";
 
 export const Route = createFileRoute("/campaigns")({
   head: () => ({
@@ -39,6 +40,19 @@ export const Route = createFileRoute("/campaigns")({
 });
 
 function CampaignsPage() {
+  const queryClient = useQueryClient();
+  const campaignsQuery = useQuery({ queryKey: ["campaigns"], queryFn: listCampaigns });
+  const createCampaignMutation = useMutation({
+    mutationFn: createCampaign,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Campaign created");
+    },
+    onError: (error) => toast.error("Could not create campaign", { description: error.message }),
+  });
+
+  const campaigns = campaignsQuery.data ?? [];
+
   return (
     <Page>
       <PageHeader
@@ -54,13 +68,21 @@ function CampaignsPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-3">
+          {campaignsQuery.isPending ? (
+            <p className="text-sm text-muted-foreground">Loading campaigns...</p>
+          ) : null}
+          {campaignsQuery.isError ? (
+            <p className="text-sm text-destructive">
+              Could not load campaigns: {campaignsQuery.error.message}
+            </p>
+          ) : null}
           {campaigns.map((c) => (
             <Card key={c.id} className="shadow-none transition-colors hover:border-primary/40">
               <CardContent className="p-5">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <h3 className="truncate font-semibold">{c.name}</h3>
+                      <h3 className="truncate font-semibold">{c.company.name}</h3>
                       <Badge
                         variant="secondary"
                         className="border-0 bg-accent text-accent-foreground capitalize"
@@ -69,7 +91,8 @@ function CampaignsPage() {
                       </Badge>
                     </div>
                     <p className="mt-1 truncate text-sm text-muted-foreground">
-                      {c.role} · {c.location} · started {c.createdAt}
+                      {c.target_role} · {c.location ?? "No location"} · started{" "}
+                      {new Date(c.created_at).toLocaleDateString()}
                     </p>
                   </div>
                   <Button asChild variant="ghost" size="sm" className="shrink-0">
@@ -82,10 +105,10 @@ function CampaignsPage() {
 
                 <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                   {[
-                    ["Candidates", c.candidates],
-                    ["Contacted", c.contacted],
-                    ["Replies", c.replies],
-                    ["Referral conversations", c.referrals],
+                    ["Candidates", 0],
+                    ["Contacted", 0],
+                    ["Replies", 0],
+                    ["Referral conversations", 0],
                   ].map(([label, value]) => (
                     <div key={label as string} className="min-w-0">
                       <p className="truncate text-xs text-muted-foreground">{label}</p>
@@ -95,11 +118,8 @@ function CampaignsPage() {
                 </div>
 
                 <div className="mt-4">
-                  <Progress value={(c.contacted / c.candidates) * 100} className="h-1.5" />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {Math.round((c.contacted / c.candidates) * 100)}% of discovered candidates
-                    contacted
-                  </p>
+                  <Progress value={0} className="h-1.5" />
+                  <p className="mt-2 text-xs text-muted-foreground">No candidates discovered yet</p>
                 </div>
               </CardContent>
             </Card>
@@ -118,9 +138,25 @@ function CampaignsPage() {
               className="space-y-4"
               onSubmit={(e) => {
                 e.preventDefault();
-                toast.success("Searching for candidates", {
-                  description: "We'll notify you when the shortlist is ready.",
-                });
+                const form = new FormData(e.currentTarget);
+                const input: CreateCampaignInput = {
+                  company_name: formString(form, "company"),
+                  target_role: formString(form, "role"),
+                  contact_goal: Number(form.get("count") ?? 50),
+                  keywords: formString(form, "keywords")
+                    .split(",")
+                    .map((keyword) => keyword.trim())
+                    .filter(Boolean),
+                };
+                const location = formString(form, "location");
+                const jobPostingUrl = formString(form, "jobUrl");
+                const seniority = formString(form, "seniority");
+                const preferredBackground = formString(form, "background");
+                if (location) input.location = location;
+                if (jobPostingUrl) input.job_posting_url = jobPostingUrl;
+                if (seniority) input.seniority = seniority;
+                if (preferredBackground) input.preferred_background = preferredBackground;
+                createCampaignMutation.mutate(input);
               }}
             >
               <Field id="company" label="Company" placeholder="RBC" />
@@ -131,11 +167,11 @@ function CampaignsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="count">People to find</Label>
-                  <Input id="count" type="number" defaultValue={50} min={1} />
+                  <Input id="count" name="count" type="number" defaultValue={50} min={1} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="seniority">Seniority</Label>
-                  <Select defaultValue="mid">
+                  <Select defaultValue="mid" name="seniority">
                     <SelectTrigger id="seniority">
                       <SelectValue />
                     </SelectTrigger>
@@ -151,7 +187,7 @@ function CampaignsPage() {
 
               <div className="space-y-1.5">
                 <Label htmlFor="background">Preferred background</Label>
-                <Select defaultValue="alumni">
+                <Select defaultValue="alumni" name="background">
                   <SelectTrigger id="background">
                     <SelectValue />
                   </SelectTrigger>
@@ -168,14 +204,15 @@ function CampaignsPage() {
                 <Label htmlFor="keywords">Keywords</Label>
                 <Textarea
                   id="keywords"
+                  name="keywords"
                   rows={3}
                   placeholder="payments, distributed systems, Ontario Tech, co-op mentor"
                 />
               </div>
 
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full" disabled={createCampaignMutation.isPending}>
                 <Search className="size-4" />
-                Find candidates
+                {createCampaignMutation.isPending ? "Creating campaign..." : "Create campaign"}
               </Button>
             </form>
           </CardContent>
@@ -190,14 +227,19 @@ function Field({
   label,
   placeholder,
 }: {
-  id: string;
-  label: string;
-  placeholder: string;
+  readonly id: string;
+  readonly label: string;
+  readonly placeholder: string;
 }) {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} placeholder={placeholder} />
+      <Input id={id} name={id} placeholder={placeholder} />
     </div>
   );
+}
+
+function formString(form: FormData, name: string): string {
+  const value = form.get(name);
+  return typeof value === "string" ? value : "";
 }

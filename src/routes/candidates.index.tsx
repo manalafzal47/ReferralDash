@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Eye, MessageSquarePlus, Sparkles } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { MatchScore } from "@/components/match-score";
 import { Page, PageHeader } from "@/components/page-shell";
 import { StageBadge } from "@/components/stage-badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { campaigns, candidates } from "@/data/outreach";
+import { discoverCandidates, listCampaignCandidates, listCampaigns } from "@/lib/api";
 
 export const Route = createFileRoute("/candidates/")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -51,23 +51,38 @@ function CandidatesPage() {
   const { campaign } = Route.useSearch();
   const [query, setQuery] = useState("");
   const [campaignFilter, setCampaignFilter] = useState(campaign);
+  const queryClient = useQueryClient();
+  const campaignsQuery = useQuery({ queryKey: ["campaigns"], queryFn: listCampaigns });
+  const candidatesQuery = useQuery({
+    queryKey: ["campaign-candidates", campaignFilter],
+    queryFn: () => listCampaignCandidates(campaignFilter),
+    enabled: campaignFilter !== "all",
+  });
+  const discoverCandidatesMutation = useMutation({
+    mutationFn: () => discoverCandidates(campaignFilter),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ["campaign-candidates", campaignFilter] });
+      if (result.candidates.length === 0) {
+        window.alert("No public GitHub profiles were found for this company.");
+      }
+    },
+  });
 
-  const rows = candidates.filter((c) => {
-    const matchesCampaign = campaignFilter === "all" || c.campaignId === campaignFilter;
+  const rows = (candidatesQuery.data ?? []).filter((c) => {
     const q = query.trim().toLowerCase();
     const matchesQuery =
       !q ||
-      c.name.toLowerCase().includes(q) ||
-      c.company.toLowerCase().includes(q) ||
-      c.role.toLowerCase().includes(q);
-    return matchesCampaign && matchesQuery;
+      c.full_name.toLowerCase().includes(q) ||
+      (c.current_company ?? "").toLowerCase().includes(q) ||
+      (c.current_role ?? "").toLowerCase().includes(q);
+    return matchesQuery;
   });
 
   return (
     <Page>
       <PageHeader
         title="Candidate discovery"
-        description={`${rows.length} people matched across your active campaigns.`}
+        description={campaignFilter === "all" ? "Choose a campaign to view discovered candidates." : `${rows.length} discovered candidates in this campaign.`}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -83,14 +98,28 @@ function CandidatesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All campaigns</SelectItem>
-            {campaigns.map((c) => (
+            {(campaignsQuery.data ?? []).map((c) => (
               <SelectItem key={c.id} value={c.id}>
-                {c.name}
+                {c.company.name} · {c.target_role}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
+
+      {campaignFilter !== "all" ? (
+        <Card className="flex items-center justify-between gap-4 shadow-none">
+            <p className="text-sm text-muted-foreground">
+              Searches public GitHub profiles for a self-reported association with the selected company.
+            </p>
+          <Button
+            onClick={() => discoverCandidatesMutation.mutate()}
+            disabled={discoverCandidatesMutation.isPending}
+          >
+              {discoverCandidatesMutation.isPending ? "Searching GitHub..." : "Find candidates"}
+          </Button>
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden p-0 shadow-none">
         <div className="overflow-x-auto">
@@ -107,6 +136,14 @@ function CandidatesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
+              {candidatesQuery.isPending && campaignFilter !== "all" ? <TableRow><TableCell colSpan={7}>Loading candidates...</TableCell></TableRow> : null}
+              {campaignFilter !== "all" && !candidatesQuery.isPending && rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                    No public GitHub profiles found yet. Try another company or location.
+                  </TableCell>
+                </TableRow>
+              ) : null}
               {rows.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">
@@ -115,28 +152,21 @@ function CandidatesPage() {
                       params={{ candidateId: c.id }}
                       className="hover:text-primary hover:underline"
                     >
-                      {c.name}
+                      {c.full_name}
                     </Link>
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {c.role} @ {c.company}
+                    {c.current_role ?? "Unknown role"} @ {c.current_company ?? "Unknown company"}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{c.location}</TableCell>
-                  <TableCell>
-                    <MatchScore score={c.matchScore} />
-                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{c.location ?? "Unknown"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">Not scored</TableCell>
                   <TableCell>
                     <ul className="space-y-0.5 text-xs text-muted-foreground">
-                      {c.reasons.map((r) => (
-                        <li key={r} className="flex items-start gap-1.5">
-                          <span className="text-success">✓</span>
-                          <span>{r}</span>
-                        </li>
-                      ))}
+                        <li>Public GitHub profile</li>
                     </ul>
                   </TableCell>
                   <TableCell>
-                    <StageBadge stage={c.stage} />
+                    <StageBadge stage="discovered" />
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">

@@ -1,262 +1,160 @@
-# cold-email-automater
+# Referral OS
 
-Build a modern SaaS dashboard UI for an AI-powered job outreach assistant.
+Referral OS is an AI-assisted outreach workspace for students and job seekers. It helps users find potential referral contacts, research them, write personalized messages, and track conversations through to referrals and interviews.
 
-The application helps students and job seekers manage referral outreach campaigns.
+## Project Structure
 
-The product flow:
+This repository contains two applications:
 
-Find people → Research them → Generate personalized messages → Review → Contact → Track responses.
+### Frontend: `src/`
 
-The design should feel like a modern AI productivity tool.
+The frontend is a Lovable-generated React application using:
 
-Inspiration:
+- React 19
+- TanStack Start and TanStack Router
+- TanStack Query for API caching
+- Vite
+- Tailwind CSS and Radix UI components
+- Recharts for analytics
 
-Linear
+The frontend owns the user experience:
 
-Notion
+- Dashboard
+- Campaign creation and campaign list
+- Candidate discovery and candidate profiles
+- Message review and editing
+- Outreach pipeline
+- Analytics views
+- User settings
 
-HubSpot CRM
+The campaigns screen is connected to the backend. It reads campaigns from `GET /api/campaigns` and creates campaigns through `POST /api/campaigns`. Other screens still contain prototype data in `src/data/outreach.ts` and will be connected incrementally.
 
-Perplexity
+### Backend: `backend/apps/api/`
 
-modern SaaS dashboards
+The backend is a FastAPI application using:
 
-Main Navigation
+- Python 3.11+
+- FastAPI
+- SQLAlchemy
+- Alembic
+- PostgreSQL
+- Pydantic settings and schemas
 
-Create a sidebar:
+The backend owns persistence and business operations:
 
-Dashboard
+- Campaigns and companies
+- Candidates and candidate facts
+- Match scoring
+- Generated messages
+- Outreach events
+- Follow-ups and responses
+- Campaign analytics
 
-Campaigns
+The API is mounted under `/api`. Current endpoints include health checks, campaign creation/listing, candidate intake/listing, candidate scoring, message generation, marking messages as sent, and campaign analytics.
 
-Candidates
+## Product Flow
 
-Messages
+```text
+Create campaign -> Find candidates -> Research and score -> Generate message -> Review -> Contact -> Track replies and referrals
+```
 
-Follow-ups
+## Local Development
 
-Analytics
+### Frontend
 
-Settings
+From the repository root:
 
-Dashboard Screen
+```powershell
+npm install --no-package-lock
+npm run dev
+```
 
-Create a clean overview.
+The project normally uses Bun, so `bun install` and `bun run dev` are also supported when Bun is installed. Open <http://localhost:5173>.
 
-Cards:
+Frontend checks:
 
-Active Campaigns
+```powershell
+npm run lint
+npm run build
+```
 
-Total Candidates
+### Backend
 
-Messages Sent
+The backend requires PostgreSQL. Docker is optional; PostgreSQL can be installed and run as a local Windows service.
 
-Response Rate
+From the API directory:
 
-Referrals
+```powershell
+cd backend/apps/api
+python -m venv .venv
+.venv\Scripts\activate
+pip install -e ".[dev]"
+copy .env.example .env
+alembic upgrade head
+uvicorn app.main:app --reload
+```
 
-Interviews
+The API runs at <http://localhost:8000>. Interactive API documentation is available at <http://localhost:8000/docs>.
 
-Example:
+Backend checks:
 
-RBC SWE Internship
+```powershell
+pytest
+```
 
-Candidates:
-50
+Smoke-test the running API:
 
-Contacted:
-32
+```powershell
+curl http://localhost:8000/api/health
+curl http://localhost:8000/api/campaigns
+```
 
-Replies:
-8
+## Running Both Applications
 
-Referral Conversations:
-5
+Use two terminals.
 
-Campaign Creation Screen
+Terminal 1, from `backend/apps/api`:
 
-Create a form:
+```powershell
+.venv\Scripts\activate
+uvicorn app.main:app --reload
+```
 
-Create New Outreach Campaign
+Terminal 2, from the repository root:
 
-Fields:
+```powershell
+npm run dev
+```
 
-Company
+The frontend uses `VITE_API_URL` when it is set. Otherwise it defaults to `http://localhost:8000/api`.
 
-Role
+## Database
 
-Location
+The initial schema is in:
 
-Job URL
+```text
+backend/apps/api/migrations/versions/0001_initial_schema.py
+```
 
-Number of people to find
+Apply it with:
 
-Seniority level
+```powershell
+cd backend/apps/api
+alembic upgrade head
+```
 
-Preferred background
+The backend currently uses PostgreSQL-specific column types, so SQLite is not a drop-in replacement.
 
-Keywords
+## Next Integration Work
 
-Button:
+The next frontend/backend slices are:
 
-"Find Candidates"
-
-Candidate Discovery Screen
-
-Create a table.
-
-Columns:
-
-Name
-
-Company
-
-Role
-
-Location
-
-Match Score
-
-Connection Reason
-
-Status
-
-Example row:
-
-Sarah Chen
-
-Software Engineer @ RBC
-
-Toronto
-
-94/100
-
-Why:
-
-✓ Ontario Tech
-
-✓ SWE background
-
-✓ Similar career path
-
-Actions:
-
-View
-
-Research
-
-Generate Message
-
-Candidate Detail Page
-
-Create a profile page.
-
-Left side:
-
-Candidate information
-
-Name
-
-Role
-
-Company
-
-Education
-
-Skills
-
-Experience
-
-Match Score:
-
-94/100
-
-Connection reasons:
-
-Same university
-
-Same city
-
-Similar career path
-
-Right side:
-
-AI Research Summary
-
-Potential outreach angle:
-
-"Ask about transitioning from university into RBC software engineering."
-
-Message Review Page
-
-Create an email/LinkedIn message editor.
-
-Show:
-
-Candidate:
-
-Sarah Chen
-
-Generated Message:
-
-Hi Sarah...
-
-Buttons:
-
-Edit
-
-Regenerate
-
-Copy Message
-
-Open LinkedIn
-
-Mark Sent
-
-Outreach CRM Page
-
-Create a Kanban board.
-
-Columns:
-
-Discovered
-
-Researching
-
-Ready
-
-Contacted
-
-Replied
-
-Referral
-
-Interview
-
-Cards should show:
-
-Name
-
-Company
-
-Match Score
-
-Last contacted
-
-Next action
-
-Analytics Page
-
-Create charts/cards:
-
-Response Rate
-
-Referral Conversion
-
-Messages Sent Over Time
-
-Best Performing Campaigns
+1. Add campaign summary counts for the dashboard and campaign cards.
+2. Connect candidate list and candidate detail pages.
+3. Persist message edits and regeneration.
+4. Add pipeline status updates and follow-up endpoints.
+5. Replace hard-coded analytics with backend aggregates.
+6. Add authentication and user-level data ownership.
 
 Best Connection Types
 
