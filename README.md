@@ -1,88 +1,41 @@
 # Referral OS
 
-Referral OS is an AI-assisted outreach workspace for students and job seekers. It helps users find potential referral contacts, research them, write personalized messages, and track conversations through to referrals and interviews.
+Referral OS helps job seekers find the strongest people in their personal network to ask for a referral. Users create an account, import connections, filter by target company and role, and review ranked warm leads.
 
-## Project Structure
+## The Problem
 
-This repository contains two applications:
+Job seekers often search LinkedIn one person at a time, without knowing who in their existing network is most likely to help. Generic outreach is easy to ignore, and keeping track of conversations is difficult.
 
-### Frontend: `src/`
+## The Solution
 
-The frontend is a Lovable-generated React application using:
+Referral OS turns a personal network into a focused referral workflow:
 
-- React 19
-- TanStack Start and TanStack Router
-- TanStack Query for API caching
-- Vite
-- Tailwind CSS and Radix UI components
-- Recharts for analytics
+1. Create an account and sign in.
+2. Import connections manually or through the configured LinkedIn MCP integration.
+3. Enter a target company and role.
+4. Review warm leads ranked by relationship strength and role/company fit.
+5. Use the connection details to make a specific referral request.
 
-The frontend owns the user experience:
+## Current Features
 
-- Dashboard
-- Campaign creation and campaign list
-- Candidate discovery and candidate profiles
-- Message review and editing
-- Outreach pipeline
-- Analytics views
-- User settings
+- Account registration and login
+- Authenticated user sessions with sign out
+- User-owned connection imports
+- Warm-lead ranking based on relationship, company, and role fit
+- LinkedIn MCP search integration when Agent Reach is configured
+- Dashboard and settings pages backed by the signed-in user
 
-The campaigns screen is connected to the backend. It reads campaigns from `GET /api/campaigns` and creates campaigns through `POST /api/campaigns`. Other screens still contain prototype data in `src/data/outreach.ts` and will be connected incrementally.
+## Tech Stack
 
-### Backend: `backend/apps/api/`
+- Frontend: React, TypeScript, TanStack Start/Router, TanStack Query, Vite, Tailwind CSS
+- Backend: Python, FastAPI, SQLAlchemy, Alembic, PostgreSQL
+- Integrations: Agent Reach and `mcporter` for LinkedIn MCP access
 
-The backend is a FastAPI application using:
+## How To Run
 
-- Python 3.11+
-- FastAPI
-- SQLAlchemy
-- Alembic
-- PostgreSQL
-- Pydantic settings and schemas
+### 1. Start the backend
 
-The backend owns persistence and business operations:
-
-- Campaigns and companies
-- Candidates and candidate facts
-- Match scoring
-- Generated messages
-- Outreach events
-- Follow-ups and responses
-- Campaign analytics
-
-The API is mounted under `/api`. Current endpoints include health checks, campaign creation/listing, candidate intake/listing, candidate scoring, message generation, marking messages as sent, and campaign analytics.
-
-## Product Flow
-
-```text
-Create campaign -> Find candidates -> Research and score -> Generate message -> Review -> Contact -> Track replies and referrals
-```
-
-## Local Development
-
-### Frontend
-
-From the repository root:
-
-```powershell
-npm install --no-package-lock
-npm run dev
-```
-
-The project normally uses Bun, so `bun install` and `bun run dev` are also supported when Bun is installed. Open <http://localhost:5173>.
-
-Frontend checks:
-
-```powershell
-npm run lint
-npm run build
-```
-
-### Backend
-
-The backend requires PostgreSQL. Docker is optional; PostgreSQL can be installed and run as a local Windows service.
-
-From the API directory:
+From the repository root, open a terminal:
 
 ```powershell
 cd backend/apps/api
@@ -90,135 +43,74 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[dev]"
 copy .env.example .env
+```
+
+Start PostgreSQL, then apply migrations and run the API:
+
+```powershell
+cd ..\..\infra
+docker compose up -d postgres
+cd ..\apps\api
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-The API runs at <http://localhost:8000>. Interactive API documentation is available at <http://localhost:8000/docs>.
+The API runs at <http://localhost:8000>. API documentation is available at <http://localhost:8000/docs>.
 
-Backend checks:
+### 2. Start the frontend
+
+In a second terminal from the repository root:
+
+```powershell
+npm install --no-package-lock
+npm run dev
+```
+
+Open <http://localhost:5173>. The frontend uses `http://localhost:8000/api` by default. Set `VITE_API_URL` when the API runs elsewhere.
+
+## LinkedIn Setup
+
+The LinkedIn button does not create a LinkedIn account or collect credentials inside Referral OS. It calls the locally configured Agent Reach LinkedIn MCP. Configure that integration separately:
+
+```powershell
+uvx mcp-server-linkedin@latest --login
+mcporter config add linkedin --command uvx --arg mcp-server-linkedin@latest --scope home
+```
+
+If LinkedIn MCP is not configured, use the manual connection import flow. The app ranks imported connections, but it does not bypass LinkedIn access controls or automatically retrieve a complete private connection list.
+
+## Validation
+
+Frontend checks from the repository root:
+
+```powershell
+npm run lint
+npm run build
+```
+
+Backend tests from `backend/apps/api`:
 
 ```powershell
 pytest
 ```
 
-Smoke-test the running API:
+Health check:
 
 ```powershell
 curl http://localhost:8000/api/health
-curl http://localhost:8000/api/campaigns
 ```
 
-## Running Both Applications
-
-Use two terminals.
-
-Terminal 1, from `backend/apps/api`:
-
-```powershell
-.venv\Scripts\activate
-uvicorn app.main:app --reload
-```
-
-Terminal 2, from the repository root:
-
-```powershell
-npm run dev
-```
-
-The frontend uses `VITE_API_URL` when it is set. Otherwise it defaults to `http://localhost:8000/api`.
-
-## Database
-
-The initial schema is in:
+## Project Structure
 
 ```text
-backend/apps/api/migrations/versions/0001_initial_schema.py
+src/                    React frontend and routes
+backend/apps/api/app/   FastAPI application
+backend/apps/api/tests/ Backend tests
+Agent-Reach/            Local Agent Reach integration source
 ```
 
-Apply it with:
+## Known Limitations
 
-```powershell
-cd backend/apps/api
-alembic upgrade head
-```
-
-The backend currently uses PostgreSQL-specific column types, so SQLite is not a drop-in replacement.
-
-## Next Integration Work
-
-The next frontend/backend slices are:
-
-1. Add campaign summary counts for the dashboard and campaign cards.
-2. Connect candidate list and candidate detail pages.
-3. Persist message edits and regeneration.
-4. Add pipeline status updates and follow-up endpoints.
-5. Replace hard-coded analytics with backend aggregates.
-6. Add authentication and user-level data ownership.
-
-Best Connection Types
-
-Design Requirements
-
-Use:
-
-TypeScript
-
-React
-
-Tailwind CSS
-
-shadcn/ui components
-
-Design should be:
-
-clean
-
-professional
-
-minimal
-
-recruiter/productivity focused
-
-responsive
-
-Avoid:
-
-flashy gradients
-
-excessive animations
-
-clutter
-
-The feeling should be:
-
-"An AI career operating system."
-
-Create reusable components.
-
-Use realistic sample data.
-
-Focus on excellent UX.
-
-This project was built with [Lovable](https://lovable.dev).
-
-**Live app**: https://career-muse-dash.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/26e42559-5ec9-4480-9a76-fbb10734d551).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+- LinkedIn authentication is handled by the local MCP setup, not by an in-app OAuth screen.
+- The current referral request and messaging experience is still being built.
+- PostgreSQL is the intended local and production database.

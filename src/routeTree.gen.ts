@@ -10,37 +10,12 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AnalyticsRouteImport } from './routes/analytics'
-import { Route as CampaignsRouteImport } from './routes/campaigns'
-import { Route as FollowUpsRouteImport } from './routes/follow-ups'
-import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as CandidatesIndexRouteImport } from './routes/candidates.index'
-import { Route as CandidatesCandidateIdRouteImport } from './routes/candidates.$candidateId'
+import { Route as WarmLeadsRouteImport } from './routes/warm-leads'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AnalyticsRoute = AnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CampaignsRoute = CampaignsRouteImport.update({
-  id: '/campaigns',
-  path: '/campaigns',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FollowUpsRoute = FollowUpsRouteImport.update({
-  id: '/follow-ups',
-  path: '/follow-ups',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MessagesRoute = MessagesRouteImport.update({
-  id: '/messages',
-  path: '/messages',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -48,90 +23,40 @@ const SettingsRoute = SettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CandidatesIndexRoute = CandidatesIndexRouteImport.update({
-  id: '/candidates/',
-  path: '/candidates/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CandidatesCandidateIdRoute = CandidatesCandidateIdRouteImport.update({
-  id: '/candidates/$candidateId',
-  path: '/candidates/$candidateId',
+const WarmLeadsRoute = WarmLeadsRouteImport.update({
+  id: '/warm-leads',
+  path: '/warm-leads',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/analytics': typeof AnalyticsRoute
-  '/campaigns': typeof CampaignsRoute
-  '/follow-ups': typeof FollowUpsRoute
-  '/messages': typeof MessagesRoute
   '/settings': typeof SettingsRoute
-  '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
-  '/candidates/': typeof CandidatesIndexRoute
+  '/warm-leads': typeof WarmLeadsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/analytics': typeof AnalyticsRoute
-  '/campaigns': typeof CampaignsRoute
-  '/follow-ups': typeof FollowUpsRoute
-  '/messages': typeof MessagesRoute
   '/settings': typeof SettingsRoute
-  '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
-  '/candidates': typeof CandidatesIndexRoute
+  '/warm-leads': typeof WarmLeadsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/analytics': typeof AnalyticsRoute
-  '/campaigns': typeof CampaignsRoute
-  '/follow-ups': typeof FollowUpsRoute
-  '/messages': typeof MessagesRoute
   '/settings': typeof SettingsRoute
-  '/candidates/$candidateId': typeof CandidatesCandidateIdRoute
-  '/candidates/': typeof CandidatesIndexRoute
+  '/warm-leads': typeof WarmLeadsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/analytics'
-    | '/campaigns'
-    | '/follow-ups'
-    | '/messages'
-    | '/settings'
-    | '/candidates/$candidateId'
-    | '/candidates/'
+  fullPaths: '/' | '/settings' | '/warm-leads'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/analytics'
-    | '/campaigns'
-    | '/follow-ups'
-    | '/messages'
-    | '/settings'
-    | '/candidates/$candidateId'
-    | '/candidates'
-  id:
-    | '__root__'
-    | '/'
-    | '/analytics'
-    | '/campaigns'
-    | '/follow-ups'
-    | '/messages'
-    | '/settings'
-    | '/candidates/$candidateId'
-    | '/candidates/'
+  to: '/' | '/settings' | '/warm-leads'
+  id: '__root__' | '/' | '/settings' | '/warm-leads'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AnalyticsRoute: typeof AnalyticsRoute
-  CampaignsRoute: typeof CampaignsRoute
-  FollowUpsRoute: typeof FollowUpsRoute
-  MessagesRoute: typeof MessagesRoute
   SettingsRoute: typeof SettingsRoute
-  CandidatesCandidateIdRoute: typeof CandidatesCandidateIdRoute
-  CandidatesIndexRoute: typeof CandidatesIndexRoute
+  WarmLeadsRoute: typeof WarmLeadsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -143,34 +68,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/analytics': {
-      id: '/analytics'
-      path: '/analytics'
-      fullPath: '/analytics'
-      preLoaderRoute: typeof AnalyticsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/campaigns': {
-      id: '/campaigns'
-      path: '/campaigns'
-      fullPath: '/campaigns'
-      preLoaderRoute: typeof CampaignsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/follow-ups': {
-      id: '/follow-ups'
-      path: '/follow-ups'
-      fullPath: '/follow-ups'
-      preLoaderRoute: typeof FollowUpsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/messages': {
-      id: '/messages'
-      path: '/messages'
-      fullPath: '/messages'
-      preLoaderRoute: typeof MessagesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -178,18 +75,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/candidates/': {
-      id: '/candidates/'
-      path: '/candidates'
-      fullPath: '/candidates/'
-      preLoaderRoute: typeof CandidatesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/candidates/$candidateId': {
-      id: '/candidates/$candidateId'
-      path: '/candidates/$candidateId'
-      fullPath: '/candidates/$candidateId'
-      preLoaderRoute: typeof CandidatesCandidateIdRouteImport
+    '/warm-leads': {
+      id: '/warm-leads'
+      path: '/warm-leads'
+      fullPath: '/warm-leads'
+      preLoaderRoute: typeof WarmLeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -197,13 +87,8 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AnalyticsRoute: AnalyticsRoute,
-  CampaignsRoute: CampaignsRoute,
-  FollowUpsRoute: FollowUpsRoute,
-  MessagesRoute: MessagesRoute,
   SettingsRoute: SettingsRoute,
-  CandidatesCandidateIdRoute: CandidatesCandidateIdRoute,
-  CandidatesIndexRoute: CandidatesIndexRoute,
+  WarmLeadsRoute: WarmLeadsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

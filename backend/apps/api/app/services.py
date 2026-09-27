@@ -1,18 +1,25 @@
+import hashlib
+import hmac
+import json
+import secrets
 import uuid
 from datetime import UTC, datetime
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, status
+from fastapi.params import Header
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
+
+from app.db import get_db
 
 from app import models
 from app.config import get_settings
 from app.enums import CandidateStatus, MessageStatus, OutreachEventType
 from app.schemas import CampaignCreate, CandidateCreate, MessageGenerateRequest
-
+from app.linkedin_client import search_people
 
 EXECUTIVE_TERMS = ("vp", "vice president", "director", "head of", "cto", "chief", "founder")
 
@@ -22,6 +29,222 @@ GITHUB_ORGANIZATIONS = {
     "td bank": "td-bank",
     "nvidia": "nvidia",
 }
+
+AUTH_TOKENS: dict[str, uuid.UUID] = {}
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return f"{salt}${digest.hex()}"
+
+
+def _verify_password(password: str, password_hash: str) -> bool:
+    salt, expected = password_hash.split("$", 1)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 200_000)
+    return hmac.compare_digest(digest.hex(), expected)
+
+
+def _make_token(user_id: uuid.UUID) -> str:
+    token = secrets.token_urlsafe(32)
+    AUTH_TOKENS[token] = user_id
+    return token
+
+
+def get_current_user(
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> models.User:
+    if authorization is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing authorization header")
+
+    scheme, _, value = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not value:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid authorization header")
+
+    user_id = AUTH_TOKENS.get(value)
+    if user_id is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired token")
+
+    user = db.get(models.User, user_id)
+    if user is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found")
+    return user
+
+
+def register_user(db: Session, payload: object) -> dict:
+    email = payload.email.lower().strip()
+    if db.scalar(select(models.User).where(models.User.email == email)):
+        raise HTTPException(status.HTTP_409_CONFLICT, "User already exists")
+
+    user = models.User(
+        email=email,
+        password_hash=_hash_password(payload.password),
+        name=payload.name.strip(),
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = _make_token(user.id)
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+
+
+def login_user(db: Session, payload: object) -> dict:
+    user = db.scalar(select(models.User).where(models.User.email == payload.email.lower().strip()))
+    if user is None or not _verify_password(payload.password, user.password_hash):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
+
+    token = _make_token(user.id)
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+
+
+def import_connections(db: Session, user: models.User, payload: object) -> dict:
+    for connection in payload.connections:
+        existing = db.scalar(
+            select(models.UserConnection).where(
+                models.UserConnection.user_id == user.id,
+                models.UserConnection.name == connection.name,
+                models.UserConnection.company == (connection.company or None),
+            )
+        )
+        if existing:
+            continue
+
+        db.add(
+            models.UserConnection(
+                user_id=user.id,
+                name=connection.name,
+                company=connection.company,
+                role=connection.role,
+                relationship=connection.relationship,
+                email=connection.email,
+                linkedin_url=connection.linkedin_url,
+                source="linkedin",
+            )
+        )
+    db.commit()
+    return {"saved": len(payload.connections), "user_id": str(user.id)}
+
+
+def import_linkedin_connections(db: Session, user: models.User, payload: object) -> dict:
+    """Import a real LinkedIn-derived list of people into the user network.
+
+    This is intentionally thin and uses the existing Agent Reach / mcporter search path so
+    we can replace the demo data without changing the rest of the app flow.
+    """
+    company_name = (payload.company or "").strip()
+    keywords = (payload.keywords or payload.target_role or "").strip()
+
+    if not company_name and not keywords:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Provide a company or a keyword search")
+
+    search_terms = keywords or company_name
+    profiles = search_people(
+        keywords=search_terms,
+        location=payload.location,
+        target_company=company_name or "",
+        limit=min(max(payload.limit or 10, 1), 25),
+        timeout=get_settings().linkedin_command_timeout,
+    )
+
+    imported: list[dict] = []
+    for profile in profiles:
+        name = (profile.get("full_name") or "LinkedIn contact").strip()
+        company = profile.get("current_company") or company_name
+        role = profile.get("current_role") or payload.target_role
+
+        imported.append(
+            {
+                "name": name,
+                "company": company,
+                "role": role,
+                "relationship": "linkedin connection",
+                "email": None,
+                "linkedin_url": profile.get("linkedin_url"),
+            }
+        )
+
+    if not imported:
+        return {"saved": 0, "user_id": str(user.id), "source": "linkedin"}
+
+    import_connections(db, user, type("ImportPayload", (), {"connections": imported})())
+    return {"saved": len(imported), "user_id": str(user.id), "source": "linkedin"}
+
+
+def get_warm_leads(db: Session, user: models.User, target_role: str | None, company: str | None) -> dict:
+    target_role_text = (target_role or "").lower().strip()
+    company_text = (company or "").lower().strip()
+
+    leads = []
+    for connection in db.scalars(select(models.UserConnection).where(models.UserConnection.user_id == user.id)).all():
+        relationship = (connection.relationship or "contact").lower()
+        role_text = (connection.role or "").lower()
+        company_text_value = (connection.company or "").lower()
+
+        score = 0
+        reason_parts = []
+
+        relationship_weights = {
+            "close friend": 40,
+            "friend": 35,
+            "mentor": 35,
+            "coworker": 30,
+            "former coworker": 30,
+            "classmate": 25,
+            "mutual": 20,
+            "alumni": 18,
+            "recruiter": 15,
+            "contact": 8,
+        }
+
+        score += relationship_weights.get(relationship, 8)
+        reason_parts.append("relationship strength")
+
+        if target_role_text and target_role_text in role_text:
+            score += 25
+            reason_parts.append("role fit")
+        elif target_role_text:
+            for token in target_role_text.split():
+                if len(token) > 3 and token in role_text:
+                    score += 12
+                    reason_parts.append("keyword match")
+                    break
+
+        if company_text and company_text in company_text_value:
+            score += 50
+            reason_parts.append("same company")
+            if relationship in {"close friend", "friend", "mentor", "coworker", "former coworker", "classmate", "mutual"}:
+                score += 15
+                reason_parts.append("warm intro path")
+        elif company_text:
+            score += 8
+            reason_parts.append("company interest")
+
+        if connection.email:
+            score += 10
+            reason_parts.append("email available")
+
+        if connection.linkedin_url:
+            score += 5
+            reason_parts.append("LinkedIn available")
+
+        if score < 0:
+            score = 0
+
+        leads.append({
+            "name": connection.name,
+            "company": connection.company,
+            "role": connection.role,
+            "relationship": connection.relationship,
+            "email": connection.email,
+            "linkedin_url": connection.linkedin_url,
+            "match_score": min(score, 100),
+            "reason": ", ".join(reason_parts),
+        })
+
+    leads.sort(key=lambda item: item["match_score"], reverse=True)
+    return {"leads": leads[:10]}
+
 
 def create_campaign(db: Session, payload: CampaignCreate) -> models.Campaign:
     company = db.scalar(select(models.Company).where(models.Company.name == payload.company_name))
@@ -55,93 +278,69 @@ def list_campaigns(db: Session) -> list[models.Campaign]:
             .order_by(models.Campaign.created_at.desc())
         ).all()
     )
-
-
 def discover_candidates(db: Session, campaign_id: uuid.UUID) -> dict:
     campaign = get_campaign(db, campaign_id)
     settings = get_settings()
-    headers = {
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "referral-os-local/0.1",
-    }
-    if settings.github_token:
-        headers["Authorization"] = f"Bearer {settings.github_token}"
 
-    query = f'company:"{campaign.company.name}"'
-    if campaign.location:
-        query += f' location:"{campaign.location}"'
+    keywords = campaign.target_role
 
-    try:
-        search_items = github_json(
-            "https://api.github.com/search/users",
-            {"q": query, "per_page": settings.github_search_limit},
-            headers,
-        ).get("items", [])
-    except HTTPError as error:
-        raise HTTPException(
-            status.HTTP_502_BAD_GATEWAY,
-            f"GitHub discovery failed with status {error.code}",
-        ) from error
-    except URLError as error:
-        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "GitHub discovery is unavailable") from error
+    if campaign.keywords:
+        keywords = f"{keywords}, {', '.join(campaign.keywords)}"
 
-    source_type = "github_public_profile"
-    if not search_items:
-        organization = GITHUB_ORGANIZATIONS.get(campaign.company.name.strip().lower())
-        if organization:
-            try:
-                search_items = github_json(
-                    f"https://api.github.com/orgs/{organization}/members",
-                    {"per_page": settings.github_search_limit},
-                    headers,
-                )
-                source_type = "github_organization_member"
-            except (HTTPError, URLError) as error:
-                if isinstance(error, HTTPError):
-                    raise HTTPException(
-                        status.HTTP_502_BAD_GATEWAY,
-                        f"GitHub organization lookup failed with status {error.code}",
-                    ) from error
-                raise HTTPException(
-                    status.HTTP_502_BAD_GATEWAY, "GitHub discovery is unavailable"
-                ) from error
+    profiles = search_people(
+        keywords=keywords,
+        location=campaign.location,
+        target_company=campaign.company.name,
+        limit=settings.linkedin_search_limit,
+        timeout=settings.linkedin_command_timeout,
+    )
 
     discovered = []
 
-    for item in search_items:
-        profile_url = item.get("url")
-        if not profile_url:
-            continue
-        try:
-            profile = github_json(profile_url, {}, headers)
-        except (HTTPError, URLError):
-            continue
-
-        full_name = profile.get("name") or profile.get("login")
-        if not full_name:
-            continue
+    for profile in profiles:
+        linkedin_url = profile["linkedin_url"]
 
         existing = db.scalar(
-            select(models.Candidate)
-            .join(models.CampaignCandidate)
-            .where(
-                models.CampaignCandidate.campaign_id == campaign_id,
-                models.Candidate.full_name == full_name,
+            select(models.Candidate).where(
+                models.Candidate.linkedin_url == linkedin_url
             )
         )
+
         if existing is not None:
+            existing.current_company = profile.get("current_company")
+            existing.current_role = profile.get("current_role")
+            existing.location = profile.get("location")
+
+            campaign_link = db.scalar(
+                select(models.CampaignCandidate).where(
+                    models.CampaignCandidate.campaign_id == campaign_id,
+                    models.CampaignCandidate.candidate_id == existing.id,
+                )
+            )
+
+            if campaign_link is None:
+                db.add(
+                    models.CampaignCandidate(
+                        campaign_id=campaign_id,
+                        candidate_id=existing.id,
+                        status=CandidateStatus.DISCOVERED,
+                    )
+                )
+
             discovered.append(existing)
             continue
 
         candidate = models.Candidate(
-            full_name=full_name,
-            current_company=profile.get("company"),
+            full_name=profile["full_name"],
+            current_company=profile.get("current_company"),
+            current_role=profile.get("current_role"),
             location=profile.get("location"),
-            github_url=profile.get("html_url"),
-            personal_site_url=profile.get("blog") or None,
+            linkedin_url=linkedin_url,
         )
+
         db.add(candidate)
         db.flush()
+
         db.add(
             models.CampaignCandidate(
                 campaign_id=campaign_id,
@@ -149,34 +348,25 @@ def discover_candidates(db: Session, campaign_id: uuid.UUID) -> dict:
                 status=CandidateStatus.DISCOVERED,
             )
         )
+
         db.add(
             models.CandidateSource(
                 candidate_id=candidate.id,
-                source_type=source_type,
-                source_url=profile.get("html_url"),
-                raw_data={
-                    "login": profile.get("login"),
-                    "bio": profile.get("bio"),
-                    "company": profile.get("company"),
-                    "location": profile.get("location"),
-                },
+                source_type=profile["source_type"],
+                source_url=linkedin_url,
+                raw_data=profile["raw_data"],
             )
         )
-        if profile.get("bio") and profile.get("html_url"):
-            db.add(
-                models.CandidateFact(
-                    candidate_id=candidate.id,
-                    fact_type="github_bio",
-                    fact_value=profile["bio"],
-                    source_url=profile["html_url"],
-                    confidence=0.7,
-                )
-            )
+
         discovered.append(candidate)
 
     db.commit()
-    return {"campaign_id": campaign_id, "source": source_type, "candidates": discovered}
 
+    return {
+        "campaign_id": campaign_id,
+        "source": "linkedin",
+        "candidates": discovered,
+    }
 
 def github_json(url: str, params: dict[str, object], headers: dict[str, str]) -> dict:
     query_string = urlencode(params)
@@ -343,6 +533,66 @@ def score_candidate(db: Session, campaign_id: uuid.UUID, candidate_id: uuid.UUID
     db.refresh(score)
     return score
 
+def linkedin_search_people(
+    keywords: str,
+    location: str | None,
+    limit: int,
+) -> list[dict]:
+    arguments = [
+        "mcporter",
+        "call",
+        "linkedin.search_people",
+        f"keywords={keywords}",
+    ]
+
+    if location:
+        arguments.append(f"location={location}")
+
+    try:
+        result = subprocess.run(
+            arguments,
+            capture_output=True,
+            text=True,
+            timeout=get_settings().linkedin_command_timeout,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "mcporter is not installed or is not available on the API PATH",
+        ) from error
+    except subprocess.TimeoutExpired as error:
+        raise HTTPException(
+            status.HTTP_504_GATEWAY_TIMEOUT,
+            "LinkedIn search timed out",
+        ) from error
+
+    if result.returncode != 0:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"LinkedIn search failed: {result.stderr[-500:]}",
+        )
+
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            "LinkedIn returned an unreadable response",
+        ) from error
+
+    if isinstance(payload, dict):
+        people = payload.get("people") or payload.get("results") or payload.get("data")
+        if isinstance(people, list):
+            return people[:limit]
+
+    if isinstance(payload, list):
+        return payload[:limit]
+
+    raise HTTPException(
+        status.HTTP_502_BAD_GATEWAY,
+        "LinkedIn returned an unexpected response format",
+    )
 
 def build_outreach_angle(
     candidate: models.Candidate, campaign: models.Campaign, facts: dict[str, str]

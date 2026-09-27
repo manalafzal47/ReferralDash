@@ -1,14 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { toast } from "sonner";
 
 import { Page, PageHeader } from "@/components/page-shell";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { useQuery } from "@tanstack/react-query";
+import { getCurrentUser } from "@/lib/api";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -30,6 +29,9 @@ export const Route = createFileRoute("/settings")({
 });
 
 function SettingsPage() {
+  const userQuery = useQuery({ queryKey: ["current-user"], queryFn: getCurrentUser });
+  const user = userQuery.data;
+
   return (
     <Page>
       <PageHeader title="Settings" description="Your profile shapes every message the assistant writes." />
@@ -42,27 +44,13 @@ function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="name">Full name</Label>
-              <Input id="name" defaultValue="Alex Rivera" />
+              <Input id="name" value={user?.name ?? ""} readOnly placeholder="Your name" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="school">University</Label>
-              <Input id="school" defaultValue="Ontario Tech University" />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" value={user?.email ?? ""} readOnly placeholder="Your email" />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="program">Program &amp; grad year</Label>
-              <Input id="program" defaultValue="BSc Computer Science · 2027" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="pitch">One-line pitch</Label>
-              <Textarea
-                id="pitch"
-                rows={3}
-                defaultValue="Third-year CS student focused on backend and payments infrastructure."
-              />
-            </div>
-            <Button size="sm" onClick={() => toast.success("Profile saved")}>
-              Save profile
-            </Button>
+              <p className="text-xs text-muted-foreground">Profile editing has been removed.</p>
           </CardContent>
         </Card>
 
@@ -74,7 +62,7 @@ function SettingsPage() {
             <Toggle
               label="Auto-research new candidates"
               hint="Run the research step as soon as a candidate is discovered."
-              defaultChecked
+              defaultChecked={false}
             />
             <Separator className="my-3" />
             <Toggle
@@ -111,9 +99,9 @@ function Toggle({
   hint,
   defaultChecked,
 }: {
-  label: string;
-  hint: string;
-  defaultChecked?: boolean | undefined;
+  readonly label: string;
+  readonly hint: string;
+  readonly defaultChecked?: boolean | undefined;
 }) {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 py-1">

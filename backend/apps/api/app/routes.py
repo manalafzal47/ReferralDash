@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app import schemas, services
+from app import models, schemas, services
 from app.db import get_db
 
 router = APIRouter()
@@ -12,6 +12,50 @@ router = APIRouter()
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/auth/register", response_model=schemas.AuthResponse, status_code=status.HTTP_201_CREATED)
+def register_user(payload: schemas.AuthRegisterRequest, db: Session = Depends(get_db)):
+    return services.register_user(db, payload)
+
+
+@router.post("/auth/login", response_model=schemas.AuthResponse)
+def login_user(payload: schemas.AuthLoginRequest, db: Session = Depends(get_db)):
+    return services.login_user(db, payload)
+
+
+@router.get("/auth/me", response_model=schemas.UserPublic)
+def me(current_user: models.User = Depends(services.get_current_user)):
+    return current_user
+
+
+@router.post("/auth/connections/import", response_model=dict)
+def import_connections(
+    payload: schemas.ConnectionImportRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(services.get_current_user),
+):
+    return services.import_connections(db, current_user, payload)
+
+
+@router.post("/auth/connections/import-linkedin", response_model=dict)
+def import_linkedin_connections(
+    payload: schemas.LinkedInImportRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(services.get_current_user),
+):
+    """Import a real LinkedIn-derived network list using the Agent Reach MCP backend."""
+    return services.import_linkedin_connections(db, current_user, payload)
+
+
+@router.get("/auth/warm-leads", response_model=schemas.WarmLeadsResponse)
+def warm_leads(
+    target_role: str | None = None,
+    company: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(services.get_current_user),
+):
+    return services.get_warm_leads(db, current_user, target_role, company)
 
 
 @router.post("/campaigns", response_model=schemas.CampaignOut, status_code=status.HTTP_201_CREATED)
@@ -35,7 +79,9 @@ def get_campaign(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
 )
 def add_candidate(
-    campaign_id: uuid.UUID, payload: schemas.CandidateCreate, db: Session = Depends(get_db)
+    campaign_id: uuid.UUID,
+    payload: schemas.CandidateCreate,
+    db: Session = Depends(get_db),
 ):
     return services.add_candidate_to_campaign(db, campaign_id, payload)
 
@@ -55,7 +101,9 @@ def discover_candidates(campaign_id: uuid.UUID, db: Session = Depends(get_db)):
     response_model=schemas.CandidateScoreOut,
 )
 def score_candidate(
-    campaign_id: uuid.UUID, candidate_id: uuid.UUID, db: Session = Depends(get_db)
+    campaign_id: uuid.UUID,
+    candidate_id: uuid.UUID,
+    db: Session = Depends(get_db),
 ):
     return services.score_candidate(db, campaign_id, candidate_id)
 
@@ -76,7 +124,9 @@ def generate_message(
 
 @router.post("/outreach/{message_id}/mark-sent", response_model=schemas.MessageOut)
 def mark_sent(
-    message_id: uuid.UUID, payload: schemas.MarkSentRequest, db: Session = Depends(get_db)
+    message_id: uuid.UUID,
+    payload: schemas.MarkSentRequest,
+    db: Session = Depends(get_db),
 ):
     return services.mark_message_sent(db, message_id, payload.platform, payload.notes)
 

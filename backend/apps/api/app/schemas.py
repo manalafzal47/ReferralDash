@@ -15,6 +15,66 @@ class CompanyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class UserPublic(BaseModel):
+    id: uuid.UUID
+    email: str
+    name: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AuthRegisterRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    email: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class AuthLoginRequest(BaseModel):
+    email: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=8, max_length=200)
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserPublic
+
+
+class ConnectionImportItem(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    company: str | None = None
+    role: str | None = None
+    relationship: str | None = None
+    email: str | None = None
+    linkedin_url: str | None = None
+
+
+class ConnectionImportRequest(BaseModel):
+    connections: list[ConnectionImportItem] = Field(default_factory=list)
+
+
+class LinkedInImportRequest(BaseModel):
+    company: str | None = None
+    keywords: str | None = None
+    target_role: str | None = None
+    location: str | None = None
+    limit: int = Field(default=10, ge=1, le=25)
+
+
+class WarmLeadOut(BaseModel):
+    name: str
+    company: str | None = None
+    role: str | None = None
+    relationship: str | None = None
+    email: str | None = None
+    linkedin_url: str | None = None
+    match_score: int
+    reason: str
+
+
+class WarmLeadsResponse(BaseModel):
+    leads: list[WarmLeadOut]
+
+
 class CampaignCreate(BaseModel):
     company_name: str = Field(min_length=1, max_length=255)
     target_role: str = Field(min_length=1, max_length=255)

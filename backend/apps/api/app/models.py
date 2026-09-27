@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, Uuid, func
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship as orm_relationship
 
 from app.db import Base
 from app.enums import CampaignStatus, CandidateStatus, MessageChannel, MessageStatus, MessageType
@@ -23,12 +23,31 @@ class User(Base, TimestampMixin):
 
     id: Mapped[uuid.UUID] = uuid_pk()
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255))
     university: Mapped[str | None] = mapped_column(String(255))
     location: Mapped[str | None] = mapped_column(String(255))
     target_roles: Mapped[list[str] | None] = mapped_column(JSON)
 
-    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="user")
+    campaigns: Mapped[list["Campaign"]] = orm_relationship(back_populates="user")
+    connections: Mapped[list["UserConnection"]] = orm_relationship(back_populates="user")
+
+
+class UserConnection(Base, TimestampMixin):
+    __tablename__ = "user_connections"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    company: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped[str | None] = mapped_column(String(255))
+    relationship: Mapped[str | None] = mapped_column(String(100))
+    email: Mapped[str | None] = mapped_column(String(255))
+    linkedin_url: Mapped[str | None] = mapped_column(String(500))
+    source: Mapped[str] = mapped_column(String(100), default="linkedin", nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    user: Mapped[User] = orm_relationship(back_populates="connections")
 
 
 class Company(Base, TimestampMixin):
@@ -39,7 +58,7 @@ class Company(Base, TimestampMixin):
     website_url: Mapped[str | None] = mapped_column(String(500))
     domain: Mapped[str | None] = mapped_column(String(255))
 
-    campaigns: Mapped[list["Campaign"]] = relationship(back_populates="company")
+    campaigns: Mapped[list["Campaign"]] = orm_relationship(back_populates="company")
 
 
 class Campaign(Base, TimestampMixin):
@@ -58,9 +77,9 @@ class Campaign(Base, TimestampMixin):
     notes: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(50), default=CampaignStatus.ACTIVE, nullable=False)
 
-    user: Mapped[User | None] = relationship(back_populates="campaigns")
-    company: Mapped[Company] = relationship(back_populates="campaigns")
-    candidates: Mapped[list["CampaignCandidate"]] = relationship(back_populates="campaign")
+    user: Mapped[User | None] = orm_relationship(back_populates="campaigns")
+    company: Mapped[Company] = orm_relationship(back_populates="campaigns")
+    candidates: Mapped[list["CampaignCandidate"]] = orm_relationship(back_populates="campaign")
 
 
 class Candidate(Base, TimestampMixin):
@@ -76,10 +95,10 @@ class Candidate(Base, TimestampMixin):
     personal_site_url: Mapped[str | None] = mapped_column(String(500))
     email: Mapped[str | None] = mapped_column(String(255))
 
-    campaigns: Mapped[list["CampaignCandidate"]] = relationship(back_populates="candidate")
-    facts: Mapped[list["CandidateFact"]] = relationship(back_populates="candidate")
-    scores: Mapped[list["CandidateScore"]] = relationship(back_populates="candidate")
-    messages: Mapped[list["Message"]] = relationship(back_populates="candidate")
+    campaigns: Mapped[list["CampaignCandidate"]] = orm_relationship(back_populates="candidate")
+    facts: Mapped[list["CandidateFact"]] = orm_relationship(back_populates="candidate")
+    scores: Mapped[list["CandidateScore"]] = orm_relationship(back_populates="candidate")
+    messages: Mapped[list["Message"]] = orm_relationship(back_populates="candidate")
 
 
 class CampaignCandidate(Base, TimestampMixin):
@@ -93,8 +112,8 @@ class CampaignCandidate(Base, TimestampMixin):
         String(50), default=CandidateStatus.DISCOVERED, nullable=False
     )
 
-    campaign: Mapped[Campaign] = relationship(back_populates="candidates")
-    candidate: Mapped[Candidate] = relationship(back_populates="campaigns")
+    campaign: Mapped[Campaign] = orm_relationship(back_populates="candidates")
+    candidate: Mapped[Candidate] = orm_relationship(back_populates="campaigns")
 
 
 class CandidateSource(Base, TimestampMixin):
@@ -120,7 +139,7 @@ class CandidateFact(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    candidate: Mapped[Candidate] = relationship(back_populates="facts")
+    candidate: Mapped[Candidate] = orm_relationship(back_populates="facts")
 
 
 class CandidateScore(Base, TimestampMixin):
@@ -134,7 +153,7 @@ class CandidateScore(Base, TimestampMixin):
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
     outreach_angle: Mapped[str | None] = mapped_column(Text)
 
-    candidate: Mapped[Candidate] = relationship(back_populates="scores")
+    candidate: Mapped[Candidate] = orm_relationship(back_populates="scores")
 
 
 class Message(Base, TimestampMixin):
@@ -149,7 +168,7 @@ class Message(Base, TimestampMixin):
     status: Mapped[str] = mapped_column(String(50), default=MessageStatus.DRAFT, nullable=False)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    candidate: Mapped[Candidate] = relationship(back_populates="messages")
+    candidate: Mapped[Candidate] = orm_relationship(back_populates="messages")
 
 
 class OutreachEvent(Base, TimestampMixin):

@@ -1,14 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  BarChart3,
-  LayoutDashboard,
-  MessageSquareText,
-  Send,
-  Settings,
-  Sparkles,
-  Target,
-  Users,
-} from "lucide-react";
+import { LayoutDashboard, LogOut, Settings, Sparkles } from "lucide-react";
 
 import {
   Sidebar,
@@ -25,15 +16,17 @@ import {
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard, exact: true },
-  { title: "Campaigns", url: "/campaigns", icon: Target },
-  { title: "Candidates", url: "/candidates", icon: Users },
-  { title: "Messages", url: "/messages", icon: MessageSquareText },
-  { title: "Follow-ups", url: "/follow-ups", icon: Send },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Warm leads", url: "/warm-leads", icon: Sparkles },
   { title: "Settings", url: "/settings", icon: Settings },
 ] as const;
 
-export function AppSidebar() {
+export function AppSidebar({
+  user,
+  onSignOut,
+}: {
+  readonly user: { name: string | null; email: string };
+  readonly onSignOut: () => void;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const isActive = (url: string, exact?: boolean) =>
@@ -80,12 +73,21 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="flex items-center gap-2.5 px-1.5 py-1">
           <div className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-            AR
+            {(user.name ?? user.email).slice(0, 2).toUpperCase()}
           </div>
           <div className="min-w-0 group-data-[collapsible=icon]:hidden">
-            <p className="truncate text-sm font-medium">Alex Rivera</p>
-            <p className="truncate text-xs text-muted-foreground">Ontario Tech · CS 2027</p>
+            <p className="truncate text-sm font-medium">{user.name ?? "Account"}</p>
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
           </div>
+          <SidebarMenuButton
+            type="button"
+            onClick={onSignOut}
+            tooltip="Sign out"
+            className="ml-auto shrink-0"
+          >
+            <LogOut />
+            <span>Sign out</span>
+          </SidebarMenuButton>
         </div>
       </SidebarFooter>
     </Sidebar>

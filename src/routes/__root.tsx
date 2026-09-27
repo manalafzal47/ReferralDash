@@ -6,14 +6,17 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useLocation,
+  useNavigate,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { clearAuthToken, getAuthToken, getCurrentUser, type AuthUser } from "@/lib/api";
 
 function NotFoundComponent() {
   return (
@@ -37,7 +40,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { readonly error: Error; readonly reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -108,7 +111,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: ReactNode }) {
+function RootShell({ children }: { readonly children: ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -124,12 +127,57 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const isLoginPage = location.pathname === "/login";
+
+  useEffect(() => {
+    if (isLoginPage) {
+      setCheckingSession(false);
+      return;
+    }
+
+    if (!getAuthToken()) {
+      void navigate({ to: "/login", replace: true });
+      return;
+    }
+
+    void getCurrentUser()
+      .then(setUser)
+      .catch(() => {
+        clearAuthToken();
+        void navigate({ to: "/login", replace: true });
+      })
+      .finally(() => setCheckingSession(false));
+  }, [isLoginPage, navigate]);
+
+  if (isLoginPage) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+        <Toaster />
+      </QueryClientProvider>
+    );
+  }
+
+  if (checkingSession || !user) {
+    return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Checking your session...</div>;
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <SidebarProvider>
         <div className="flex min-h-screen w-full bg-background">
-          <AppSidebar />
+          <AppSidebar
+            user={user}
+            onSignOut={() => {
+              clearAuthToken();
+              setUser(null);
+              void navigate({ to: "/login", replace: true });
+            }}
+          />
           <div className="flex min-w-0 flex-1 flex-col">
             <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b bg-background/80 px-4 backdrop-blur">
               <SidebarTrigger />
